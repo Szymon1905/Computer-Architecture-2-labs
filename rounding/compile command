@@ -1,0 +1,3 @@
+gcc -m32 zao4.c var4.s control4.s -no-pie -o zao4
+
+no-pie - so gcc does not do position independent executable - 
