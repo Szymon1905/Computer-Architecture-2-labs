@@ -1,0 +1,192 @@
+# Numbers of kernel functions.
+EXIT_NR  = 1
+READ_NR  = 3
+WRITE_NR = 4
+ 
+STDIN  = 0
+STDOUT = 1
+EXIT_CODE_SUCCESS = 0
+ 
+.data
+data: .space 393216 # pamiec o rozmiarze najwiekszego pliku insort32k96b.bin 
+iterator: .space 4
+
+ # wzor z using as
+ # section:disp(base, index, scale) <- AT&T
+ # section:[base + index*scale + disp]
+
+# bufory do porownania o rozmiarze 96 bit
+bufor1: .space 12 
+bufor2: .space 12
+
+# liczniki na pentle zewnentrzne i wewnetrzne
+licznik1: .space 4 
+licznik2: .space 4
+ 
+.text
+.global _start
+_start:
+mov $data, %ecx
+jmp odczytpliku
+ 
+# section: disp(base)
+start:
+addl $3, (iterator)
+add $12, %ecx
+ 
+odczytpliku:
+mov $READ_NR, %eax 
+mov $STDIN, %ebx 
+mov $12, %edx 
+int $0x80
+ 
+cmp $12, %eax
+je start
+cmp $0, %eax
+jl koniec
+# tu sie dane zczytaly
+
+# rozkaz + suffix
+# sufffixy
+# b - 8bit
+# w - 16bit
+# l - 32bit
+# q - 64bit
+ 
+movl $0, (licznik1)
+pentlazewnentrzna:   # pentla Z
+movl $0, (licznik2)
+pentlawewnentrzna:   # pentla W
+ 
+# Elementy do porownania
+# pierwszy element do porownania
+mov $data, %eax
+mov (licznik2), %ebx
+mov $bufor1, %edx
+mov (%eax, %ebx, 4), %ecx
+mov %ecx, (%edx)
+mov 4(%eax, %ebx, 4), %ecx
+mov %ecx, 4(%edx)
+mov 8(%eax, %ebx, 4), %ecx
+mov %ecx, 8(%edx)
+ 
+# drugi element do porownania
+mov $data, %eax
+mov (licznik2), %ebx
+mov $bufor2, %edx
+mov 12(%eax, %ebx, 4), %ecx
+mov %ecx, (%edx)
+mov 16(%eax, %ebx, 4), %ecx
+mov %ecx, 4(%edx)
+mov 20(%eax, %ebx, 4), %ecx
+mov %ecx, 8(%edx)
+ 
+# porownanie elementow w buforach
+mov $bufor1, %ecx
+mov $bufor2, %edx
+ 
+mov 8(%ecx), %eax
+cmp %eax,  8(%edx)
+jl zamiana
+jg dobrze
+mov 4(%ecx), %eax
+cmp %eax,  4(%edx)
+jb zamiana
+ja dobrze
+mov (%ecx), %eax
+cmp %eax,  (%edx)
+jb zamiana
+ja dobrze
+jmp rowne
+ 
+zamiana:
+# zamiana elementow miejscami
+ 
+mov $data, %eax
+mov (licznik2), %ebx
+mov $bufor1, %edx
+mov (%edx), %ecx
+mov %ecx, 12(%eax, %ebx, 4)
+mov 4(%edx), %ecx
+mov %ecx, 16(%eax, %ebx, 4)
+mov 8(%edx), %ecx
+mov %ecx, 20(%eax, %ebx, 4)
+ 
+mov $data, %eax
+mov (licznik2), %ebx
+mov $bufor2, %edx
+mov (%edx), %ecx
+mov %ecx, (%eax, %ebx, 4)
+mov 4(%edx), %ecx
+mov %ecx, 4(%eax, %ebx, 4)
+mov 8(%edx), %ecx
+mov %ecx, 8(%eax, %ebx, 4)
+ 
+dobrze:
+# nic nie trzeba robic bo so dobrze ustawione
+rowne:
+# tu tez nie
+ 
+addl $3,(licznik2)
+mov (licznik2), %edx
+add $6, %edx
+cmpl (iterator), %edx
+jbe pentlawewnentrzna
+ 
+addl $3,(licznik1)
+mov (licznik1), %edx
+add $3, %edx
+cmpl (iterator), %edx
+jbe pentlazewnentrzna
+ 
+ 
+_end:
+mov $data, %ecx
+jmp zapisz
+ 
+zakoncz:
+subl $3, (iterator)
+cmpl $0, (iterator)
+je koniec
+ 
+add $12, %ecx
+ 
+zapisz:
+mov $WRITE_NR, %eax
+mov $STDOUT, %ebx
+mov $12, %edx
+int $0x80
+ 
+cmp $12, %eax
+je zakoncz
+ 
+koniec:
+mov $EXIT_NR, %eax
+mov $EXIT_CODE_SUCCESS, %ebx
+int $0x80
+ 
+ 
+ 
+# MOJE NOTATKI
+# komenda ls -l - pokazuje rozmiary plikow
+# diff - do porownania plikow
+#
+# section:[base + index*scale + disp]
+# section:disp(base, index, scale) <- AT&T
+# section:disp(base)  addl $3, (licznik1)
+# $DATA - pobierz wartosc / tryb adresowania natychmiastowy
+# DATA - pobierz wartosc pod adresem w pamieci 
+# cmpl - porownanie 32 bit
+# je - jump jak rowne
+# jbe - jump jak rowne lub mniejsze
+# ja - jump jak wieksze  CF i ZF sa nieustawione
+# jg - jump jak wieksze  SF = OF i ZF jets nieustawione
+# jb - jump jak CF jest ustawione mnijesze
+# jl - jump jak mniejsze 
+# sub + suffix / sufffixy -> b-8, w-16, l-32, q-64
+# addl - dodaje 2 operandy 32 bit
+# data: - etykieta
+# .data - dyrektywa
+# mov $etykieta, %edx - kopiuje wartość znajdującą się w etykiecie do rejestru edx
+# addl $3, (etykieta) dodaje wartość 3 do zawartości pamięci pod adresem w etykiecie
+# operand pamięciowy z odniesieniem pośrednim
